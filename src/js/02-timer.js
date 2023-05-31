@@ -1,18 +1,20 @@
-import flatpickr from 'flatpickr';
-import 'flatpickr/dist/flatpickr.min.css';
-import Notiflix from 'notiflix';
+import flatpickr from "flatpickr";
+import { Notify } from 'notiflix/build/notiflix-notify-aio';
+import "flatpickr/dist/flatpickr.min.css";
 
-const refs = {
-  input: document.querySelector('#datetime-picker'),
-  start: document.querySelector('button[data-start]'),
-  days: document.querySelector('span[data-days]'),
-  hours: document.querySelector('span[data-hours]'),
-  mins: document.querySelector('span[data-minutes]'),
-  secs: document.querySelector('span[data-seconds]'),
-};
+const dateInput = document.querySelector('#datetime-picker');
+const startBtn = document.querySelector('[data-start]');
 
-let intervalId = null;
-refs.start.disabled = true;
+const daysEl = document.querySelector('[data-days]');
+const hoursEl = document.querySelector('[data-hours]');
+const minutesEl = document.querySelector('[data-minutes]');
+const secondsEl = document.querySelector('[data-seconds]');
+
+
+startBtn.setAttribute('disabled', true);
+let chosenDate = null;
+let timerId = null;
+
 
 const options = {
   enableTime: true,
@@ -20,42 +22,48 @@ const options = {
   defaultDate: new Date(),
   minuteIncrement: 1,
   onClose(selectedDates) {
-    console.log(selectedDates[0]);
+    if (selectedDates[0] < Date.now()) {
+        Notify.failure("Please choose a date in the future")
+        startBtn.setAttribute('disabled', true);
+        dateInput.style.borderColor = "red";
+    } else {
+        chosenDate = selectedDates[0];
 
-    if (selectedDates[0] < new Date()) {
-      refs.start.disabled = true;
-      Notiflix.Notify.failure('Please choose a date in the future! Do not look back..');
-      return;
+        startBtn.removeAttribute('disabled');
+        startBtn.addEventListener('click', timerOn);
+        dateInput.style.borderColor = "#569ff7";
     }
-    if (selectedDates[0] > new Date()) {
-      refs.start.disabled = false;
-    }
-
-    refs.start.addEventListener('click', () => {
-      intervalId = setInterval(() => {
-        const differenceInTime = selectedDates[0] - new Date();
-
-        if (differenceInTime < 1000) {
-          clearInterval(intervalId);
-        }
-        const result = convertMs(differenceInTime);
-        viewOfTimer(result);
-      }, 1000);
-    });
   },
 };
 
+
 flatpickr('#datetime-picker', options);
 
-function viewOfTimer({ days, hours, minutes, seconds }) {
-  refs.days.textContent = `${days}`;
-  refs.hours.textContent = `${hours}`;
-  refs.mins.textContent = `${minutes}`;
-  refs.secs.textContent = `${seconds}`;
+function timerOn(){
+    timerId = setInterval(() => {
+        startBtn.setAttribute('disabled', true);
+        dateInput.setAttribute('disabled', true);
+
+        const currentTime = Date.now();
+        const deltaTime = chosenDate - currentTime;
+
+        if (deltaTime < 1000) {
+            clearInterval(timerId);
+            startBtn.removeAttribute('disabled');
+        }
+ 
+        const { days, hours, minutes, seconds } = convertMs(deltaTime);
+        updClockInterface({ days, hours, minutes, seconds });
+        
+    }, 1000)
 }
 
-function addLeadingZero(value) {
-  return String(value).padStart(2, '0');
+
+function updClockInterface({ days, hours, minutes, seconds }) {
+    daysEl.textContent = days;
+    hoursEl.textContent = hours;
+    minutesEl.textContent = minutes;
+    secondsEl.textContent = seconds;
 }
 
 function convertMs(ms) {
@@ -65,10 +73,19 @@ function convertMs(ms) {
   const hour = minute * 60;
   const day = hour * 24;
 
+  // Remaining days
   const days = addLeadingZero(Math.floor(ms / day));
+  // Remaining hours
   const hours = addLeadingZero(Math.floor((ms % day) / hour));
+  // Remaining minutes
   const minutes = addLeadingZero(Math.floor(((ms % day) % hour) / minute));
+  // Remaining seconds
   const seconds = addLeadingZero(Math.floor((((ms % day) % hour) % minute) / second));
 
   return { days, hours, minutes, seconds };
+}
+
+
+function addLeadingZero(value) {
+    return String(value).padStart(2, '0');
 }
